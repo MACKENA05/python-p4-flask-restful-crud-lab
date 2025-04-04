@@ -20,6 +20,8 @@ api = Api(app)
 class Plants(Resource):
 
     def get(self):
+        # plants = Plant.query.all()
+        # plants_dict = [plant.to_dict() for plant in plants]
         plants = [plant.to_dict() for plant in Plant.query.all()]
         return make_response(jsonify(plants), 200)
 
@@ -42,11 +44,45 @@ api.add_resource(Plants, '/plants')
 
 
 class PlantByID(Resource):
-
     def get(self, id):
-        plant = Plant.query.filter_by(id=id).first().to_dict()
-        return make_response(jsonify(plant), 200)
+        plant = Plant.query.filter_by(id=id).first()
+        if not plant:
+            return {"error": f"Plant with id {id} not found"}, 404
+        return plant.to_dict(), 200
+    
+    def delete(self, id):
+        plant = Plant.query.filter_by(id=id).first()
+        if not plant:
+            return {"error": f"Plant with id {id} not found"}, 404
+    
+        try:
+            db.session.delete(plant)
+            db.session.commit()
+            return make_response('', 200)  # Use make_response with empty string
+        except Exception as e:
+            db.session.rollback()
+            return {"error": str(e)}, 500
+    
+    def patch(self, id):
+        plant = Plant.query.filter_by(id=id).first()
+        if not plant:
+            return {"error": f"Plant with id {id} not found"}, 404
+    
+        data = request.get_json()
+        if not data or 'is_in_stock' not in data:
+            return {"error": "is_in_stock field is required"}, 400
 
+        allowed_fields = {'is_in_stock', 'price'}
+        for key, value in data.items():
+            if key in allowed_fields:
+                setattr(plant, key, value)
+
+        try:
+            db.session.commit()
+            return plant.to_dict(), 200
+        except Exception as e:
+            db.session.rollback()
+            return {"error": str(e)}, 500
 
 api.add_resource(PlantByID, '/plants/<int:id>')
 
